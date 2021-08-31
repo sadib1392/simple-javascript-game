@@ -1,6 +1,5 @@
 const canvas = document.querySelector('canvas');
 const c = canvas.getContext('2d')
-const paused = true
 canvas.width = innerWidth
 canvas.height = innerHeight
 
@@ -75,6 +74,56 @@ class Enemy {
     }
 }
 
+// particles
+class Particle {
+    constructor(x, y, radius, color, velocity) {
+        this.x = x
+        this.y = y
+        this.radius = radius
+        this.color = color
+        this.velocity = velocity
+        this.alpha = 1
+    }
+
+    draw() {
+        c.save()
+        c.globalAlpha = this.alpha
+        c.beginPath()
+        c.arc(this.x, this.y, this.radius, 0, Math.PI * 2, false)
+        c.fillStyle = this.color
+        c.fill()
+        c.restore()
+    }
+
+    update() {
+        this.draw()
+        this.x = this.x + this.velocity.x
+        this.y = this.y + this.velocity.y
+        this.alpha -= 0.01
+    }
+}
+
+// powerups
+class Powerup {
+    constructor(x, y, radius, color) {
+        this.x = x
+        this.y = y
+        this.radius = radius
+        this.color = color
+    }
+
+    draw() {
+        c.beginPath()
+        c.arc(this.x, this.y, this.radius, 0, Math.PI * 2, false)
+        c.fillStyle = this.color
+        c.fill()
+    }
+
+    update() {
+        this.draw()
+    }
+}
+
 const x = canvas.width / 2
 const y = canvas.height / 2
 const scoreKeeper = document.getElementById('scorekeeper')
@@ -83,13 +132,16 @@ const player = new Player(x, y, 25, '#39A6C6')
 
 const projectiles = []
 const enemies = []
+const particles = []
+const powerups = []
+
 const randomColors = ['#CE318C', '#31CE73', '#E65119']
 
 
 //spawns enemies
 function enemySpawn() {
     setInterval(() => {
-        const radius = Math.random() * 5 + 10
+        const radius = Math.random() * 10 + 10
         const x = Math.random() * canvas.width
         const y = Math.random() < .5 ? 0 - radius : canvas.height + radius
         const color = randomColors[Math.floor(Math.random() * 3)]
@@ -103,18 +155,42 @@ function enemySpawn() {
     }, 500)
 }
 
+function powerupSpawn() {
+    
+        const radius = 10
+        const x = Math.random() * canvas.width
+        const y = Math.random() * canvas.height
+        const color = 'blue'
+
+        if(score == 10) {
+            powerups.push(new Powerup(x, y, radius, color))
+        }
+}
+
 
 // controls animation 
 let animationId
 let score = 0
 
 
-if(paused) {
         function animate() {
             animationId = requestAnimationFrame(animate)
             c.fillStyle = 'rgba(0, 0, 0, 0.2)'
             c.fillRect(0, 0, canvas.width, canvas.height)
             player.draw()
+                
+
+
+            particles.forEach((particle, index) => {
+                if(particle.alpha <= 0) {
+                    particles.splice(index, 1)
+                }
+                else {
+                    particle.update()
+                }
+            })
+
+            
             projectiles.forEach((projectile, index) => {
                 projectile.update()
     
@@ -127,8 +203,12 @@ if(paused) {
                     }
     
             })
-    
-    
+
+            powerups.forEach((powerup, index) => {
+                powerup.draw()
+            })
+            
+
         
         
     
@@ -139,6 +219,7 @@ if(paused) {
                 
                 //player death
                 if(dist - enemy.radius - player.radius < 1) {
+
                     cancelAnimationFrame(animationId)
                 }
             
@@ -148,30 +229,48 @@ if(paused) {
     
     
                 if(dist - enemy.radius - projectile.radius < 1) {
+
+                    for(let i = 0; i < 8; i++) {
+                        particles.push(new Particle(projectile.x, projectile.y, Math.random() * 2 + 3, enemy.color, 
+                            {
+                            x: (Math.random() - 0.5) * (Math.random() * 4 + 1), 
+                            y: (Math.random() - 0.5) * (Math.random() * 4 + 1)
+                            }
+                            ))
+                    }
+
+                    // keep score when enemies are hit
                     score += 2
                     scoreKeeper.textContent = score
-    
-                    setTimeout( () =>{
-                    enemies.splice(index, 1)
-                    projectiles.splice(projectileIndex, 1)
-                    }, 0)
+
+                    //shrinking effect
+                    if(enemy.radius - 5 > 10) {
+                        gsap.to(enemy, {
+                            radius: enemy.radius - 10
+                        })
+                        setTimeout( () =>{
+                            projectiles.splice(projectileIndex, 1)
+                            }, 0)
+                    } else {
+                        setTimeout( () =>{
+                            enemies.splice(index, 1)
+                            projectiles.splice(projectileIndex, 1)
+                            }, 0)
+                    }
+                    
                 }         
                 
             })
         }) 
     
     }
-}
-else if(!paused) {
-    update()
-}
+
 
 
 
 
 // shoot projectiles
 addEventListener('click', (event) => {
-    console.log(projectiles)
     const angle = Math.atan2(event.clientY - player.y, event.clientX - player.x)
     const velocity = {
         x: Math.cos(angle) * 5,
@@ -219,10 +318,6 @@ function onKeyDown(event) {
 
         case 68: //d
         keyD = true;
-        break;
-        
-        case 69: //e
-        paused = !paused;
         break;
     }
 }
@@ -280,4 +375,4 @@ function movePlayer() {
 movePlayer()
 animate()
 enemySpawn()
-togglePause()
+powerupSpawn()
